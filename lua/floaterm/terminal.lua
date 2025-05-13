@@ -1,5 +1,6 @@
 local log = require("floaterm.log")
 local config = require("floaterm.config")
+local timeout_original = -1
 
 local augroup = vim.api.nvim_create_augroup("floaterm", { clear = true })
 
@@ -16,7 +17,6 @@ local M = {
 }
 M.__index = M
 
----@param self TerminalManager Terminal manager object
 ---@param id string Terminal ID
 ---@param lhs string Key mapping for the terminal
 ---@param opts table Options for the terminal
@@ -29,7 +29,7 @@ function M:new(id, lhs, opts)
 
   local terminal = {
     id = id,
-    buf = vim.api.nvim_create_buf(false, true),
+    buf = nil,
     win = nil,
   }
   setmetatable(terminal, self)
@@ -73,15 +73,43 @@ end
 ---@param id string Terminal ID
 ---@return boolean True if the terminal was deleted, false if not found
 function M:delete(id)
+  log.debug("Deleting terminal: %s", id)
+  if not id then
+    log.warn("Terminal ID is nil")
+    return false
+  end
+
+  local found = false
+  for key, _ in pairs(self.terminals) do
+    if key == id then
+      found = true
+      break
+    end
+  end
+
+  if not found then
+    log.warn("Terminal with ID %s not found", id)
+    return false
+  end
+
   local terminal = self.terminals[id]
   if not terminal then
     log.warn("Terminal with ID %s not found", id)
     return false
   end
 
-  vim.keymap.del("n", terminal.lhs)
+  if terminal.win then
+    vim.api.nvim_win_close(terminal.win, true)
+    terminal.win = nil
+    log.debug("Closed terminal window: %s", id)
+  end
 
-  vim.api.nvim_buf_delete(terminal.buf, { force = true })
+  if terminal.buf then
+    vim.api.nvim_buf_delete(terminal.buf, { force = true })
+    terminal.buf = nil
+    log.debug("Deleted terminal buffer: %s", id)
+  end
+
   table.remove(self.terminals, id)
   log.debug("Deleted terminal: %s", id)
   return true
@@ -106,10 +134,16 @@ function M:toggle(id, opts)
   return terminal
 end
 
----@param self TerminalManager Terminal manager object
 ---@param id string Terminal ID
 ---@param opts table Options for the terminal
 function M:show(id, opts)
+  if timeout_original == -1 then
+    timeout_original = vim.api.nvim_get_option("timeoutlen")
+    log.debug("Original timeout length: %d", timeout_original)
+  end
+
+  vim.api.nvim_set_option("timeoutlen", config.timeout)
+
   local terminal = self.terminals[id]
   if not terminal then
     log.warn("Terminal with ID %s not found", id)
@@ -125,10 +159,16 @@ function M:show(id, opts)
   local height = opts.height or config.height
   local border = opts.border or config.border
 
-  if not vim.api.nvim_buf_is_valid(terminal.buf) then
+  if not terminal.buf or not vim.api.nvim_buf_is_valid(terminal.buf) then
     log.warn("Terminal buffer %s is not valid", id)
     self.terminals[id].buf = vim.api.nvim_create_buf(false, true)
+    terminal = self.terminals[id]
+    if not terminal.buf then
+      log.error("Failed to create terminal buffer %s", id)
+      return
+    end
   end
+
   local ui = vim.api.nvim_list_uis()[1]
   local win_opts_centered = {
     relative = "editor",
@@ -142,10 +182,16 @@ function M:show(id, opts)
 
   terminal.win = vim.api.nvim_open_win(terminal.buf, true, win_opts_centered)
 
+  -- Buffer options
   vim.api.nvim_buf_set_option(terminal.buf, "buflisted", false)
+
+  -- Window options
   vim.api.nvim_win_set_option(terminal.win, "winhl", "Normal:Normal")
   vim.api.nvim_win_set_option(terminal.win, "winblend", 0)
-  vim.api.nvim_win_set_option(terminal.win, "winhighlight", "Normal:Normal")
+  vim.api.nvim_win_set_option(terminal.win, "cursorline", false)
+  vim.api.nvim_win_set_option(terminal.win, "winfixwidth", true)
+  vim.api.nvim_win_set_option(terminal.win, "winfixheight", true)
+  vim.api.nvim_win_set_option(terminal.win, "wrap", false)
 
   if vim.bo[terminal.buf].buftype ~= "terminal" then
     vim.cmd.terminal()
@@ -158,9 +204,13 @@ function M:show(id, opts)
   log.debug("Shown terminal window: %s", id)
 end
 
----@param self TerminalManager Terminal manager object
 ---@param id string Terminal ID
 function M:hide(id)
+  if timeout_original ~= -1 then
+    vim.api.nvim_set_option("timeoutlen", timeout_original)
+    print("Timeout length restored to: " .. timeout_original)
+  end
+
   if id == nil then
     log.warn("Terminal ID is nil")
     return
@@ -183,50 +233,30 @@ function M:hide(id)
   end
 end
 
----@param id string Terminal ID
----@param opts table Options for the terminal
----@return Terminal Terminal object
-function M:open(id, opts)
-  local _ = self:new(id, opts)
-  return self:toggle(id, opts)
-end
-
----@param self TerminalManager Terminal manager object
----@param id string Terminal ID
-function M:close(id)
-  if self.terminals == nil or #self.terminals == 0 then
-    log.warn("No terminals to close")
-    return
-  end
-
-  local terminal = self.terminals[id]
-  if not terminal then
-    log.warn("Terminal with ID %s not found", id)
-    return
-  end
-
-  self.hide(id)
-
-  if terminal.buf then
-    vim.api.nvim_buf_delete(terminal.buf, { force = true })
-    terminal.buf = nil
-    log.debug("Deleted terminal buffer: %s", id)
-  end
-
-  table.remove(self.terminals, id)
-end
-
 function M:delete_all()
-  for id, terminal in pairs(self.terminals) do
-    if terminal.win then
-      vim.api.nvim_win_close(terminal.win, true)
-      terminal.win = nil
-      log.debug("Closed terminal window: %s", id)
-    end
+  if vim.tbl_isempty(self.terminals) then
+    log.warn("No terminals to delete")
+    return
+  end
 
+  log.debug("terminals: %s", vim.inspect(self.terminals))
+  for id, _ in pairs(self.terminals) do
+    log.debug("Deleting terminal: %s", id)
     M.delete(id)
-    log.debug("Deleted terminal: %s", id)
   end
 end
+
+function init()
+  -- Declare keymap for deleting all terminals
+  vim.keymap.set(
+    { "n", "t" }, config.close_all_keymap,
+    function()
+      M:delete_all()
+    end,
+    { noremap = true, silent = true, desc = "Close all terminals" }
+  )
+end
+
+init()
 
 return M

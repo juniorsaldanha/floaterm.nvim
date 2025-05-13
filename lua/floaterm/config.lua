@@ -2,10 +2,13 @@
 ---@field width number Width of the floaterm
 ---@field height number Height of the floaterm
 ---@field border string|table Border style of the floaterm
+---@field close_all_keymap string Key mapping to close all terminals
 local config = {
   width = 0.75,
   height = 0.75,
   border = "rounded",
+  close_all_keymap = "<leader>tc",
+  timeout = 150,
 }
 
 ---@param self Configuration Configuration object

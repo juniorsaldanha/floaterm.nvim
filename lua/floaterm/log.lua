@@ -1,8 +1,12 @@
 local M = {}
+M.enable = false
 
 ---@param msg string Message to log
 ---@param level number Log level (default: INFO)
 M.log = function(msg, level)
+  if not M.enable then
+    return
+  end
   vim.notify(
     msg,
     level or vim.log.levels.INFO,
