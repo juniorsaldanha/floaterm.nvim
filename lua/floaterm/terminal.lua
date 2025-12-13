@@ -204,6 +204,17 @@ function M:show(id, opts)
     end
   end
 
+  -- Set buffer-local keymaps to hide app with q or <C-c> (only for apps, not regular terminals)
+  if terminal.cmd then
+    vim.keymap.set("t", "q", function()
+      self:hide(id)
+    end, { buffer = terminal.buf, noremap = true, silent = true, desc = "Hide app" })
+
+    vim.keymap.set("t", "<C-c>", function()
+      self:hide(id)
+    end, { buffer = terminal.buf, noremap = true, silent = true, desc = "Hide app" })
+  end
+
   if vim.api.nvim_get_mode().mode ~= "i" then
     vim.cmd.startinsert()
   end
