@@ -3,12 +3,15 @@
 ---@field height number Height of the floaterm
 ---@field border string|table Border style of the floaterm
 ---@field close_all_keymap string Key mapping to close all terminals
+---@field timeout number Timeout for keymap waiting
+---@field cmd string|nil Command to execute (nil for default shell)
 local config = {
   width = 0.75,
   height = 0.75,
   border = "rounded",
   close_all_keymap = "<leader>tc",
   timeout = 150,
+  cmd = nil,
 }
 
 ---@param self Configuration Configuration object

@@ -9,6 +9,7 @@ local augroup = vim.api.nvim_create_augroup("floaterm", { clear = true })
 ---@field buf number
 ---@field win number
 ---@field lhs string
+---@field cmd string|nil Command to execute (nil for default shell)
 
 ---@class TerminalManager
 ---@field terminals table<string, Terminal>
@@ -27,15 +28,16 @@ function M:new(id, lhs, opts)
     return self.terminals[id]
   end
 
+  local _config = vim.tbl_deep_extend("force", {}, config, opts or {})
+
   local terminal = {
     id = id,
     buf = nil,
     win = nil,
+    cmd = _config.cmd,
   }
   setmetatable(terminal, self)
   self.terminals[id] = terminal
-
-  local _config = vim.tbl_deep_extend("force", {}, config, opts or {})
 
   vim.keymap.set(
     { "n", "t" }, lhs,
@@ -194,7 +196,12 @@ function M:show(id, opts)
   vim.api.nvim_win_set_option(terminal.win, "wrap", false)
 
   if vim.bo[terminal.buf].buftype ~= "terminal" then
-    vim.cmd.terminal()
+    local cmd = opts.cmd or terminal.cmd
+    if cmd then
+      vim.fn.termopen(cmd)
+    else
+      vim.cmd.terminal()
+    end
   end
 
   if vim.api.nvim_get_mode().mode ~= "i" then

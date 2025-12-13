@@ -19,6 +19,17 @@ M.register_terminal = function(id, lhs, opts)
   return terminal
 end
 
+---@param id string Terminal ID (e.g., "lazygit", "claude")
+---@param lhs string Key mapping for the terminal
+---@param cmd string Command/binary to execute (e.g., "lazygit", "claude")
+---@param opts Configuration? Optional configuration options
+---@returns Terminal Terminal object
+M.register_app = function(id, lhs, cmd, opts)
+  opts = opts or {}
+  opts.cmd = cmd
+  return M.register_terminal(id, lhs, opts)
+end
+
 ---@param timeoutlen number Timeout length for the terminal keymap waiting
 M.set_timeout = function(timeoutlen)
   if timeoutlen and type(timeoutlen) == "number" then
