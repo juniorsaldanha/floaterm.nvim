@@ -39,13 +39,9 @@ function M:new(id, lhs, opts)
   setmetatable(terminal, self)
   self.terminals[id] = terminal
 
-  vim.keymap.set(
-    { "n", "t" }, lhs,
-    function()
-      self:toggle(id, _config)
-    end,
-    { noremap = true, silent = true, desc = "Toggle terminal " .. id }
-  )
+  vim.keymap.set({ "n", "t" }, lhs, function()
+    self:toggle(id, _config)
+  end, { noremap = true, silent = true, desc = "Toggle terminal " .. id })
 
   vim.api.nvim_create_autocmd({ "WinEnter" }, {
     group = augroup,
@@ -204,15 +200,27 @@ function M:show(id, opts)
     end
   end
 
-  -- Set buffer-local keymaps to hide app with q or <C-c> (only for apps, not regular terminals)
+  -- Set buffer-local keymaps to hide app/terminal
   if terminal.cmd then
-    vim.keymap.set("t", "q", function()
-      self:hide(id)
-    end, { buffer = terminal.buf, noremap = true, silent = true, desc = "Hide app" })
-
-    vim.keymap.set("t", "<C-c>", function()
-      self:hide(id)
-    end, { buffer = terminal.buf, noremap = true, silent = true, desc = "Hide app" })
+    AppsKeymapsHide = {
+      "<C-c>",
+      "<C-_>",
+      "<C-q>",
+    }
+    for _, lhs in ipairs(AppsKeymapsHide) do
+      vim.keymap.set({ "t", "n" }, lhs, function()
+        self:hide(id)
+      end, { buffer = terminal.buf, noremap = true, silent = true, desc = "Hide app" })
+    end
+  else
+    TerminalKeymapsHide = {
+      "<C-_>",
+    }
+    for _, lhs in ipairs(TerminalKeymapsHide) do
+      vim.keymap.set({ "t", "n" }, lhs, function()
+        self:hide(id)
+      end, { buffer = terminal.buf, noremap = true, silent = true, desc = "Hide terminal" })
+    end
   end
 
   if vim.api.nvim_get_mode().mode ~= "i" then
@@ -266,13 +274,9 @@ end
 
 function init()
   -- Declare keymap for deleting all terminals
-  vim.keymap.set(
-    { "n", "t" }, config.close_all_keymap,
-    function()
-      M:delete_all()
-    end,
-    { noremap = true, silent = true, desc = "Close all terminals" }
-  )
+  vim.keymap.set({ "n", "t" }, config.close_all_keymap, function()
+    M:delete_all()
+  end, { noremap = true, silent = true, desc = "Close all terminals" })
 end
 
 init()
