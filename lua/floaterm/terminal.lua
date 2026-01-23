@@ -32,9 +32,11 @@ function M:new(id, lhs, opts)
 
   local terminal = {
     id = id,
+    lhs = lhs,
     buf = nil,
     win = nil,
     cmd = _config.cmd,
+    hide_keys = {},
   }
   setmetatable(terminal, self)
   self.terminals[id] = terminal
@@ -108,7 +110,7 @@ function M:delete(id)
     log.debug("Deleted terminal buffer: %s", id)
   end
 
-  table.remove(self.terminals, id)
+  self.terminals[id] = nil
   log.debug("Deleted terminal: %s", id)
   return true
 end
@@ -221,6 +223,13 @@ function M:show(id, opts)
         self:hide(id)
       end, { buffer = terminal.buf, noremap = true, silent = true, desc = "Hide terminal" })
     end
+  end
+
+  -- Custom hide keymaps
+  for _, lhs in ipairs(terminal.hide_keys or {}) do
+    vim.keymap.set({ "t", "n" }, lhs, function()
+      self:hide(id)
+    end, { buffer = terminal.buf, noremap = true, silent = true, desc = "Hide " .. id })
   end
 
   if vim.api.nvim_get_mode().mode ~= "i" then

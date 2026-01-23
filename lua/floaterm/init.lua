@@ -40,11 +40,18 @@ M.add_keymap_hide = function(id, lhs)
     return false
   end
 
-  vim.keymap.set({ "n", "t" }, lhs, function()
-    tManager:hide(id)
-  end, { noremap = true, silent = true, desc = "Hide terminal " .. id })
+  if not terminal.hide_keys then
+    terminal.hide_keys = {}
+  end
+  table.insert(terminal.hide_keys, lhs)
 
-  log.debug("Set hide keymap for terminal %s to %s", id, lhs)
+  if terminal.buf and vim.api.nvim_buf_is_valid(terminal.buf) then
+    vim.keymap.set({ "t", "n" }, lhs, function()
+      tManager:hide(id)
+    end, { buffer = terminal.buf, noremap = true, silent = true, desc = "Hide terminal " .. id })
+  end
+
+  log.debug("Added hide keymap for terminal %s: %s", id, lhs)
   return true
 end
 
@@ -58,8 +65,19 @@ M.remove_keymap_hide = function(id, lhs)
     return false
   end
 
-  pcall(vim.keymap.del, { "n", "t" }, lhs)
-  log.debug("Removed hide keymap for terminal %s from %s", id, lhs)
+  if terminal.hide_keys then
+    for i = #terminal.hide_keys, 1, -1 do
+      if terminal.hide_keys[i] == lhs then
+        table.remove(terminal.hide_keys, i)
+      end
+    end
+  end
+
+  if terminal.buf and vim.api.nvim_buf_is_valid(terminal.buf) then
+    pcall(vim.keymap.del, { "t", "n" }, lhs, { buffer = terminal.buf })
+  end
+
+  log.debug("Removed hide keymap for terminal %s: %s", id, lhs)
   return true
 end
 
