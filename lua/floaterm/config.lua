@@ -5,6 +5,7 @@
 ---@field close_all_keymap string Key mapping to close all terminals
 ---@field timeout number Timeout for keymap waiting
 ---@field cmd string|nil Command to execute (nil for default shell)
+---@field close_on_exit boolean Auto-close the float when the process exits on its own
 local config = {
   width = 0.75,
   height = 0.75,
@@ -12,6 +13,7 @@ local config = {
   close_all_keymap = "<leader>tc",
   timeout = 150,
   cmd = nil,
+  close_on_exit = true,
 }
 
 ---@param self Configuration Configuration object

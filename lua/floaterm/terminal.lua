@@ -200,6 +200,21 @@ function M:show(id, opts)
     else
       vim.cmd.terminal()
     end
+
+    -- Auto-close the float when the process exits on its own (e.g. the app
+    -- is quit via its own keymap), instead of leaving a "[Process exited]" buffer.
+    if opts.close_on_exit ~= false then
+      vim.api.nvim_create_autocmd("TermClose", {
+        group = augroup,
+        buffer = terminal.buf,
+        once = true,
+        callback = function()
+          vim.schedule(function()
+            self:close(id)
+          end)
+        end,
+      })
+    end
   end
 
   -- Set buffer-local keymaps to hide app/terminal
@@ -265,6 +280,28 @@ function M:hide(id)
     log.debug("Hidden terminal window: %s", id)
   else
     log.warn("Terminal window %s is already hidden", id)
+  end
+end
+
+---Close a terminal whose process has exited: hide the window and dispose of the
+---dead buffer so the next toggle spawns a fresh process. Keeps the terminal
+---registered so its toggle keymap keeps working.
+---@param id string Terminal ID
+function M:close(id)
+  local terminal = self.terminals[id]
+  if terminal == nil then
+    log.warn("Terminal with ID %s not found", id)
+    return
+  end
+
+  self:hide(id)
+
+  if terminal.buf then
+    if vim.api.nvim_buf_is_valid(terminal.buf) then
+      vim.api.nvim_buf_delete(terminal.buf, { force = true })
+    end
+    terminal.buf = nil
+    log.debug("Disposed exited terminal buffer: %s", id)
   end
 end
 
